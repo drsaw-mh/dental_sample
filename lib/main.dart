@@ -570,10 +570,73 @@ class ProjectsView extends StatefulWidget {
 }
 
 class _ProjectsViewState extends State<ProjectsView> {
-  late final List<ClinicProject> projects = [...sampleProjects];
+  var projects = [...sampleProjects];
+  var isLoading = false;
   var isSaving = false;
 
-  Future<void> addProject(ProjectDraft draft) async {
+  @override
+  void initState() {
+    super.initState();
+    loadProjects();
+  }
+
+  int get dueThisMonth {
+    return projects
+        .where((project) => project.deadline.startsWith('Jun'))
+        .length;
+  }
+
+  int get averageProgress {
+    if (projects.isEmpty) {
+      return 0;
+    }
+
+    final total = projects.fold<double>(
+      0,
+      (sum, project) => sum + project.progress,
+    );
+    return ((total / projects.length) * 100).round();
+  }
+
+  Future<void> loadProjects() async {
+    setState(() => isLoading = true);
+
+    try {
+      final response = await http.get(Uri.parse('$apiBaseUrl/api/projects'));
+
+      if (response.statusCode != 200) {
+        throw Exception('Project API returned ${response.statusCode}');
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = body['data'] as List<dynamic>;
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        projects = data
+            .cast<Map<String, dynamic>>()
+            .map(ClinicProject.fromJson)
+            .toList();
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Using local project data')));
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  Future<bool> addProject(ProjectDraft draft) async {
     setState(() => isSaving = true);
 
     try {
@@ -591,7 +654,7 @@ class _ProjectsViewState extends State<ProjectsView> {
       final data = body['data'] as Map<String, dynamic>;
 
       if (!mounted) {
-        return;
+        return false;
       }
 
       setState(() {
@@ -601,9 +664,10 @@ class _ProjectsViewState extends State<ProjectsView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${draft.name} added to projects')),
       );
+      return true;
     } catch (_) {
       if (!mounted) {
-        return;
+        return false;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -611,6 +675,7 @@ class _ProjectsViewState extends State<ProjectsView> {
           content: Text('Could not add project. Backend offline?'),
         ),
       );
+      return false;
     } finally {
       if (mounted) {
         setState(() => isSaving = false);
@@ -627,34 +692,34 @@ class _ProjectsViewState extends State<ProjectsView> {
           compactAspectRatio: 1.22,
           minTileWidth: 220,
           wideAspectRatio: 1.45,
-          children: const [
+          children: [
             _MetricCard(
               'Active Projects',
-              '6',
-              '+2',
+              '${projects.length}',
+              isLoading ? 'Syncing' : 'Live',
               Icons.work,
-              Color(0xFF0B7285),
+              const Color(0xFF0B7285),
             ),
             _MetricCard(
               'Due This Month',
-              '4',
+              '$dueThisMonth',
               'Jun',
               Icons.event_note,
-              Color(0xFFC2410C),
+              const Color(0xFFC2410C),
             ),
             _MetricCard(
               'Avg Progress',
-              '54%',
+              '$averageProgress%',
               '+9%',
               Icons.trending_up,
-              Color(0xFF166534),
+              const Color(0xFF166534),
             ),
             _MetricCard(
               'Blocked',
               '1',
               'Audit',
               Icons.report_problem_outlined,
-              Color(0xFF7C3AED),
+              const Color(0xFF7C3AED),
             ),
           ],
         ),
@@ -691,9 +756,18 @@ class _ProjectsViewState extends State<ProjectsView> {
         const SizedBox(height: 16),
         _Panel(
           title: 'Clinic Projects',
-          action: '${projects.length} active',
+          action: isLoading ? 'Syncing' : '${projects.length} active',
           child: Column(
             children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: isLoading ? null : loadProjects,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                ),
+              ),
+              const SizedBox(height: 8),
               for (final project in projects) _ProjectTile(project: project),
             ],
           ),
@@ -1198,7 +1272,7 @@ class _ProjectForm extends StatefulWidget {
   const _ProjectForm({required this.isSaving, required this.onSubmit});
 
   final bool isSaving;
-  final ValueChanged<ProjectDraft> onSubmit;
+  final Future<bool> Function(ProjectDraft draft) onSubmit;
 
   @override
   State<_ProjectForm> createState() => _ProjectFormState();
@@ -1220,7 +1294,7 @@ class _ProjectFormState extends State<_ProjectForm> {
     super.dispose();
   }
 
-  void submit() {
+  Future<void> submit() async {
     final name = nameController.text.trim();
     final owner = ownerController.text.trim();
     final deadline = deadlineController.text.trim();
@@ -1234,7 +1308,7 @@ class _ProjectFormState extends State<_ProjectForm> {
       return;
     }
 
-    widget.onSubmit(
+    final created = await widget.onSubmit(
       ProjectDraft(
         name: name,
         owner: owner,
@@ -1243,6 +1317,16 @@ class _ProjectFormState extends State<_ProjectForm> {
         summary: summaryController.text.trim(),
       ),
     );
+
+    if (!mounted || !created) {
+      return;
+    }
+
+    nameController.clear();
+    ownerController.clear();
+    deadlineController.clear();
+    summaryController.clear();
+    setState(() => priority = 'Medium');
   }
 
   @override
