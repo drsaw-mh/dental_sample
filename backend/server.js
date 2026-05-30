@@ -28,6 +28,26 @@ export function createApp() {
         return;
       }
 
+      if (url.pathname === '/' && req.method === 'GET') {
+        sendJson(res, 200, {
+          service: 'dental-app-backend',
+          message: 'DentalOps API is running.',
+          routes: [
+            '/health',
+            '/api/dashboard',
+            '/api/booking',
+            '/api/projects',
+            '/api/users',
+            '/api/doctors',
+            '/api/appointments',
+            '/api/invoices',
+            '/api/followUps',
+            '/api/procedures',
+          ],
+        });
+        return;
+      }
+
       if (url.pathname === '/api/dashboard' && req.method === 'GET') {
         sendJson(res, 200, { data: buildDashboard() });
         return;

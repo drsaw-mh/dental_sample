@@ -27,6 +27,15 @@ describe('DentalOps API', () => {
     assert.equal(body.status, 'ok');
   });
 
+  it('returns API information at the root route', async () => {
+    const response = await fetch(`${baseUrl}/`);
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.service, 'dental-app-backend');
+    assert.ok(body.routes.includes('/api/projects'));
+  });
+
   it('returns dashboard metrics', async () => {
     const response = await fetch(`${baseUrl}/api/dashboard`);
     const body = await response.json();
