@@ -1,4 +1,4 @@
-import 'package:dental_app/main.dart';
+import 'package:dental_app/dental_app/dental_user/dental_user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +11,13 @@ void main() {
     expect(find.text('DentalOps'), findsWidgets);
     expect(find.text('Today Appointments'), findsOneWidget);
     expect(find.text('Pending Follow Ups'), findsOneWidget);
+    expect(find.text('Clinic Live Status'), findsOneWidget);
+    expect(find.text('Queue now'), findsOneWidget);
+    expect(find.text('Current booking'), findsOneWidget);
+    expect(find.text('B-103 - Aina Rahman'), findsOneWidget);
+    expect(find.text('Next booking'), findsOneWidget);
+    expect(find.text('B-104'), findsWidgets);
+    expect(find.text('Estimated time'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.event_available_outlined).first);
     await tester.pumpAndSettle();
